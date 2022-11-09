@@ -19,7 +19,7 @@ class CedisAnnouncementTitleScrapper {
             require(responseStatus.code == 200) {
                 //TODO alert the dev
             }
-            selectAllTitleElements().map {
+            selectTitleElements().map {
                 it.toAnnouncementTitle()
             }
         }
@@ -49,7 +49,7 @@ class CedisAnnouncementTitleScrapper {
         // Matches only month names
         val MONTH_MATCHER = RAW_MONTH_MATCHER.toRegex()
 
-        // Matches month names and
+        // Matches month names and dates that precede the month
         val DATES_AND_MONTH_MATCHER = ".+?$RAW_MONTH_MATCHER".toRegex()
     }
 }
@@ -64,7 +64,7 @@ fun List<CedisAnnouncementTitleScrapper.AnnouncementTitle>.filterActualAnnouncem
         .filter { announcementTitle -> announcementTitle.dates.isNotEmpty() }
 }
 
-private fun Result.selectAllTitleElements(): List<DocElement> = htmlDocument {
+private fun Result.selectTitleElements(): List<DocElement> = htmlDocument {
     div {
         withClass = "posts-listing"
         h3 {
@@ -89,25 +89,7 @@ private fun DocElement.toAnnouncementTitle(): CedisAnnouncementTitleScrapper.Ann
     val datesAndMonthStrings = datesAndMonthIndices.map { text.substring(it) }
 
     val dates = datesAndMonthStrings.flatMap { datesAndMonthString ->
-        val monthString = MONTH_MATCHER.find(datesAndMonthString)?.value
-            ?: throw IllegalArgumentException("Month not found in datesAndMonthString")
-
-        // Java.time library enumerates months starting from 1
-        val monthIndex = (CedisAnnouncementTitleScrapper.MONTHS_IN_SOURCE_LANGUAGE.indexOf(monthString) + 1).also {
-            require(it != 0) {
-                //TODO alert the dev
-            }
-        }
-
-        // Servisne informacije za 16., 17. i 18.oktobar
-        // Servisne informacije za 27. oktobar
-
-        val daysOfMonth = "\\d+".toRegex().findAll(datesAndMonthString).toList().map { it.value.toInt() }
-
-        daysOfMonth.map { dayOfMonth ->
-            //TODO handle cases of launching the app right after the new year has started
-            LocalDate.of(LocalDate.now().year, monthIndex, dayOfMonth)
-        }
+        getAnnouncementDates(datesAndMonthString)
     }
 
     return CedisAnnouncementTitleScrapper.AnnouncementTitle(
@@ -115,4 +97,26 @@ private fun DocElement.toAnnouncementTitle(): CedisAnnouncementTitleScrapper.Ann
         url = url,
         dates = dates
     )
+}
+
+private fun getAnnouncementDates(datesAndMonthString: String): List<LocalDate> {
+    val monthString = MONTH_MATCHER.find(datesAndMonthString)?.value
+        ?: throw IllegalArgumentException("Month not found in datesAndMonthString")
+
+    // Java.time library enumerates months starting from 1
+    val monthIndex = (CedisAnnouncementTitleScrapper.MONTHS_IN_SOURCE_LANGUAGE.indexOf(monthString) + 1).also {
+        require(it != 0) {
+            //TODO alert the dev
+        }
+    }
+
+    // Servisne informacije za 16., 17. i 18.oktobar
+    // Servisne informacije za 27. oktobar
+
+    val daysOfMonth = "\\d+".toRegex().findAll(datesAndMonthString).toList().map { it.value.toInt() }
+
+    return daysOfMonth.map { dayOfMonth ->
+        //TODO handle cases of launching the app right after the new year has started
+        LocalDate.of(LocalDate.now().year, monthIndex, dayOfMonth)
+    }
 }

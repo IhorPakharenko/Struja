@@ -1,5 +1,6 @@
 package com.isao.struja.application
 
+import com.isao.struja.scrape.CedisAnnouncementScrapper
 import com.isao.struja.scrape.CedisAnnouncementTitleScrapper
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
@@ -14,7 +15,8 @@ fun main() {
     embeddedServer(Netty) {
         launch {
             CedisAnnouncementTitleScrapper().getLatestAnnouncementTitles().map { title ->
-                println("${title.title}:${title.dates.map { it.toString() }.joinToString { it }}")
+//                println("${title.title}:${title.dates.map { it.toString() }.joinToString { it }}")
+                CedisAnnouncementScrapper(emptyList()).getAnnouncementDetails(title.url)
             }
 //            while (true) {
 //                println("Scraping")
