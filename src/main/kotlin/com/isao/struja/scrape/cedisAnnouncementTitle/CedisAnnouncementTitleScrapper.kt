@@ -1,7 +1,7 @@
-package com.isao.struja.scrape
+package com.isao.struja.scrape.cedisAnnouncementTitle
 
-import com.isao.struja.scrape.CedisAnnouncementTitleScrapper.Companion.DATES_AND_MONTH_MATCHER
-import com.isao.struja.scrape.CedisAnnouncementTitleScrapper.Companion.MONTH_MATCHER
+import com.isao.struja.scrape.cedisAnnouncementTitle.CedisAnnouncementTitleScrapper.Companion.DATES_AND_MONTH_MATCHER
+import com.isao.struja.scrape.cedisAnnouncementTitle.CedisAnnouncementTitleScrapper.Companion.MONTH_MATCHER
 import com.isao.struja.util.normalizeSpaces
 import it.skrape.core.htmlDocument
 import it.skrape.fetcher.*
