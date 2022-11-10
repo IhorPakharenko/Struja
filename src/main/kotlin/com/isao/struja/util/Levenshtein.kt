@@ -3,7 +3,8 @@ package com.isao.struja.util
 import kotlin.math.min
 
 /**
- *  Levenshtein Distance algorithm implementation using Kotlin. Tells how similar one string is to another.
+ *  Levenshtein Distance algorithm implementation using Kotlin. Tells how different one string is to another.
+ *  @return The number of steps required to make strings equal.
  *  @author Viciously taken from this guy https://gist.github.com/ademar111190/34d3de41308389a0d0d8
  */
 

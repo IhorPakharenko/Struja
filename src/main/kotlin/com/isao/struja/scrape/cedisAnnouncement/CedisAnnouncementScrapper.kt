@@ -1,8 +1,7 @@
 package com.isao.struja.scrape.cedisAnnouncement
 
 import com.isao.struja.application.db.model.Location
-import com.isao.struja.util.levenshtein
-import com.isao.struja.util.normalizeSpaces
+import com.isao.struja.util.*
 import it.skrape.core.document
 import it.skrape.fetcher.BrowserFetcher
 import it.skrape.fetcher.Result
@@ -11,11 +10,11 @@ import it.skrape.fetcher.skrape
 import it.skrape.selects.DocElement
 import it.skrape.selects.html5.div
 import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeFormatterBuilder
 import java.time.format.SignStyle
 import java.time.temporal.ChronoField
-
-//TODO scrape http://cedis.me/kontakt/
+import kotlin.math.min
 
 //TODO maybe refactor this into dsl
 class CedisAnnouncementScrapper(private val supportedTownNames: List<String>) {
@@ -51,7 +50,7 @@ class CedisAnnouncementScrapper(private val supportedTownNames: List<String>) {
         // If it ever changes, the following logic will break
         return postContent.children.fold(mutableListOf<MutableList<DocElement>>()) { acc, docElement ->
             acc.apply {
-                if (levenshtein(docElement.ownText, ANNOUNCEMENT_DAY_OWN_TEXT) < 5) {
+                if (docElement.ownText.diff(ANNOUNCEMENT_DAY_OWN_TEXT) < 5) {
                     add(mutableListOf())
                 } else {
                     lastOrNull()?.add(docElement)
@@ -96,10 +95,6 @@ class CedisAnnouncementScrapper(private val supportedTownNames: List<String>) {
         //Consider replacing throwing exceptions with using optionals
         val rawTimeRanges = "(\\d{1,2}:?\\d{0,2})[\\w\\s]{2,4}(\\d{1,2}:?\\d{0,2})".toRegex().find(text)?.groupValues?.drop(1)?.map { it.normalizeSpaces() }?.chunked(2)?: return null
 
-//        val (_, rawTimeRanges, rawPlacesAndExtras) = ANNOUNCEMENT_TIME_AND_PLACES_MATCHER.find(text)?.groupValues
-//            ?: return null
-//        (\d{1,2}:?\d{0,2})[\w\s]{2,4}(\d{1,2}:?\d{0,2})
-
         val timeRanges: List<OutageTimeAndPlaces.TimeRange> = rawTimeRanges
             .map { rawTimeRange ->
                 val (startTime, endTime) = rawTimeRange
@@ -108,7 +103,7 @@ class CedisAnnouncementScrapper(private val supportedTownNames: List<String>) {
                     LocalTime.parse(endTime, TIME_FORMATTER)
                 )
             }
-        val rawPlacesAndExtras = "(sati.*)\$".toRegex().find(text)?.groupValues?.last()?.normalizeSpaces()?: return null
+        val rawPlacesAndExtras = "sati(.*)\$".toRegex().find(text)?.groupValues?.last()?.normalizeSpaces()?: return null
 
         //TODO refactor
         val maybeExtraStartIndex = rawPlacesAndExtras.lastIndexOfAny(charArrayOf('(', '–'))
@@ -120,12 +115,12 @@ class CedisAnnouncementScrapper(private val supportedTownNames: List<String>) {
 
         val outageType = parseOutageType(maybeExtras)
         val rawPlaces = if (outageType != null) {
-            rawPlacesAndExtras.replace(maybeExtras, "")
+            rawPlacesAndExtras - maybeExtras
         } else {
             rawPlacesAndExtras
         }
 
-        val places = rawPlaces.replace("[:–]".toRegex(), "").split(*LIST_PARTS_DELIMITERS)
+        val places = rawPlaces.remove("[:–]".toRegex()).split(*LIST_PARTS_DELIMITERS).map { it.trim() }
 
         return OutageTimeAndPlaces(
             timeRanges = timeRanges,
@@ -135,8 +130,9 @@ class CedisAnnouncementScrapper(private val supportedTownNames: List<String>) {
     }
 
     private fun parseOutageType(string: String): Location.OutageType? {
-        if (!string.contains("isključenja")) return null
-        return if (string.contains("kratkotrajna") || string.contains("kratka")) {
+        val words = string.split(' ')
+        if (words.none { it.diff("isključenja") < 2 }) return null
+        return if (words.any { it.diff("kratkotrajna") < 2 || it.diff("kratka") < 2 }) {
             Location.OutageType.SHORT_TERM_OUTAGES
         } else {
             Location.OutageType.LASTING_OUTAGE
@@ -146,12 +142,8 @@ class CedisAnnouncementScrapper(private val supportedTownNames: List<String>) {
     companion object {
         const val ANNOUNCEMENT_DAY_OWN_TEXT =
             "Zbog planiranih radova na mreži, , bez napajanja električnom energijom će ostati:"
-
-        //TODO shrunk the matcher as much as possible to handle at least some of their misprints. Check if this doesn't break anything
-//        val ANNOUNCEMENT_TIME_AND_PLACES_MATCHER = "u terminu od\\s*(.*)sati\\W*(.*)".toRegex()
-        val ANNOUNCEMENT_TIME_AND_PLACES_MATCHER = "od\\s*(.*)sati\\W*(.*)".toRegex()
         val LIST_PARTS_DELIMITERS = arrayOf("/", ",", " i ")
-        val TIME_FORMATTER = DateTimeFormatterBuilder()
+        val TIME_FORMATTER: DateTimeFormatter = DateTimeFormatterBuilder()
             .appendValue(ChronoField.HOUR_OF_DAY, 1, 2, SignStyle.NOT_NEGATIVE)
             .optionalStart()
             .appendLiteral(':')
